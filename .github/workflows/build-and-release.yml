@@ -1,4 +1,4 @@
-name: Single Secret Dynamic Commit
+name: Secure Dynamic Commit
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
   contents: write  # Push করার জন্য write permission
 
 jobs:
-  single-secret-commit:
+  secure-commit:
     runs-on: ubuntu-latest
 
     steps:
@@ -20,7 +20,7 @@ jobs:
         with:
           persist-credentials: false  # Explicit token ব্যবহার করব
 
-      # Step 2: Create a dynamic file using single secret
+      # Step 2: Create a dynamic file using a secret
       - name: Create dynamic file
         run: |
           mkdir -p output
@@ -28,7 +28,7 @@ jobs:
         env:
           VAR1: ${{ secrets.VAR1 }}  # GitHub Secret ব্যবহার হচ্ছে
 
-      # Step 3: Commit and push the file
+      # Step 3: Commit and push the file securely
       - name: Commit and push file
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # নিরাপদ token
