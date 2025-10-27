@@ -1,55 +1,27 @@
-name: Build and Dispatch APK
+name: Upload Artifact Workflow
 
 on:
   push:
-    tags: ['v*']
-  workflow_dispatch:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
-  build_release:
+  build-and-upload:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 11
+      - name: Create a sample file
+        run: echo "Hello World" > hello.txt
 
-      - uses: android-actions/setup-android@v3
-        with:
-          api-level: 33
-          build-tools: '33.0.2'
-
-      - name: Decode Keystore
-        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > blackrose.keystore
-
-      - name: Set Signing Env Vars
-        run: |
-          echo "RELEASE_STORE_FILE=blackrose.keystore" >> $GITHUB_ENV
-          echo "RELEASE_STORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
-          echo "RELEASE_KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> $GITHUB_ENV
-          echo "RELEASE_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> $GITHUB_ENV
-
-      - name: Build Release APK
-        run: |
-          ./gradlew assembleRelease \
-            -Pandroid.injected.signing.store.file=$RELEASE_STORE_FILE \
-            -Pandroid.injected.signing.store.password=$RELEASE_STORE_PASSWORD \
-            -Pandroid.injected.signing.key.alias=$RELEASE_KEY_ALIAS \
-            -Pandroid.injected.signing.key.password=$RELEASE_KEY_PASSWORD
-
-      - name: Upload APK Artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: apk-artifact
-          path: app/build/outputs/apk/release/app-release.apk
-
-      - name: Dispatch to Release Repo
-        uses: peter-evans/repository-dispatch@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          repository: ${{ secrets.APP_RELEASE_REPO }}
-          event-type: new-release
-          client-payload: '{"tag":"${{ github.ref_name }}"}'
+          name: hello-artifact
+          path: hello.txt
+          overwrite: true
