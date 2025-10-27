@@ -1,16 +1,16 @@
-name: Secure Dynamic Commit
+name: Secure Commit and Push with PAT
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch:
+  workflow_dispatch:  # ম্যানুয়ালি trigger করার জন্য
 
 permissions:
-  contents: write  # Push করার জন্য write permission
+  contents: write  # GITHUB_TOKEN use করলে write permission
 
 jobs:
-  secure-commit:
+  commit-and-push:
     runs-on: ubuntu-latest
 
     steps:
@@ -20,27 +20,25 @@ jobs:
         with:
           persist-credentials: false  # Explicit token ব্যবহার করব
 
-      # Step 2: Create a dynamic file using a secret
-      - name: Create dynamic file
+      # Step 2: Create a sample file
+      - name: Create hello.txt
         run: |
           mkdir -p output
-          echo "This is my secret variable: $VAR1" > output/secret.txt
-        env:
-          VAR1: ${{ secrets.VAR1 }}  # GitHub Secret ব্যবহার হচ্ছে
+          echo "Hello World from PAT workflow" > output/hello.txt
 
-      # Step 3: Commit and push the file securely
+      # Step 3: Commit and push using PAT
       - name: Commit and push file
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # নিরাপদ token
+          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}  # GitHub secret থেকে token
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          git add output/secret.txt
+          git add output/hello.txt
 
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "Add secret.txt from workflow at $(date +'%Y-%m-%d %H:%M:%S')"
-            git push https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git main
+            git commit -m "Add hello.txt from workflow at $(date +'%Y-%m-%d %H:%M:%S')"
+            git push https://x-access-token:${PAT_TOKEN}@github.com/${{ github.repository }}.git main
           fi
