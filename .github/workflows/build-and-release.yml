@@ -6,6 +6,9 @@ on:
       - main
   workflow_dispatch: # ম্যানুয়ালি ট্রিগার করার জন্য
 
+permissions:
+  contents: write # Git push করার অনুমতি
+
 jobs:
   create-and-commit:
     runs-on: ubuntu-latest
@@ -30,4 +33,4 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add output/hello.txt
           git commit -m "Add hello.txt from workflow" || echo "No changes to commit"
-          git push
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git main
