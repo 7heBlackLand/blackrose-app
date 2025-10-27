@@ -1,36 +1,46 @@
-name: Create and Commit File
+name: Single Secret Dynamic Commit
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch: # ম্যানুয়ালি ট্রিগার করার জন্য
+  workflow_dispatch:
 
 permissions:
-  contents: write # Git push করার অনুমতি
+  contents: write  # Push করার জন্য write permission
 
 jobs:
-  create-and-commit:
+  single-secret-commit:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Repository চেকআউট করা
+      # Step 1: Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
-          persist-credentials: true # push করার জন্য প্রয়োজন
+          persist-credentials: false  # Explicit token ব্যবহার করব
 
-      # Step 2: একটি sample ফাইল তৈরি করা
-      - name: Create a sample file
+      # Step 2: Create a dynamic file using single secret
+      - name: Create dynamic file
         run: |
           mkdir -p output
-          echo "Hello World" > output/hello.txt
+          echo "This is my secret variable: $VAR1" > output/secret.txt
+        env:
+          VAR1: ${{ secrets.VAR1 }}  # GitHub Secret ব্যবহার হচ্ছে
 
-      # Step 3: ফাইলটি commit ও push করা
+      # Step 3: Commit and push the file
       - name: Commit and push file
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # নিরাপদ token
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add output/hello.txt
-          git commit -m "Add hello.txt from workflow" || echo "No changes to commit"
-          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git main
+
+          git add output/secret.txt
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Add secret.txt from workflow at $(date +'%Y-%m-%d %H:%M:%S')"
+            git push https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git main
+          fi
