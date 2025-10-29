@@ -1,44 +1,110 @@
-name: Secure Commit and Push with PAT
+name: Build and Commit Android APK
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch:  # ম্যানুয়ালি trigger করার জন্য
-
-permissions:
-  contents: write  # GITHUB_TOKEN use করলে write permission
+  workflow_dispatch:
 
 jobs:
-  commit-and-push:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout repository
+      # 🧩 Step 1: Checkout code
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
+      # 🐍 Step 2: Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          persist-credentials: false  # Explicit token ব্যবহার করব
+          python-version: '3.10'
 
-      # Step 2: Create a sample file
-      - name: Create hello.txt
+      # ⚙️ Step 3: Install system dependencies (Ubuntu 24.04 compatible)
+      - name: Install system dependencies
         run: |
-          mkdir -p output
-          echo "Hello World from PAT workflow" > output/hello.txt
+          sudo apt-get update
+          sudo apt-get install -y \
+            openjdk-17-jdk \
+            zip \
+            unzip \
+            libffi-dev \
+            libssl-dev \
+            git \
+            pkg-config \
+            libgl1-mesa-dev \
+            libgles2-mesa-dev \
+            libncurses6 \
+            python3-pip
 
-      # Step 3: Commit and push using PAT
-      - name: Commit and push file
-        env:
-          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}  # GitHub secret থেকে token
+      # ⚡ Step 4: Cache Buildozer and Gradle to speed up builds
+      - name: Cache Buildozer and Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.buildozer
+            ~/.gradle
+          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}
+          restore-keys: |
+            buildozer-${{ runner.os }}-
+
+      # 🧰 Step 5: Install Python dependencies globally
+      - name: Install Python dependencies
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          python -m pip install --upgrade pip
+          pip install buildozer Cython kivy virtualenv
 
-          git add output/hello.txt
+      # 🧱 Step 6: Prepare Buildozer virtual environment
+      - name: Prepare Buildozer environment
+        run: |
+          mkdir -p ~/.buildozer
+          python -m venv ~/.buildozer/venv
+          source ~/.buildozer/venv/bin/activate
+          pip install --upgrade pip
+          pip install buildozer Cython kivy
 
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "Add hello.txt from workflow at $(date +'%Y-%m-%d %H:%M:%S')"
-            git push https://x-access-token:${PAT_TOKEN}@github.com/${{ github.repository }}.git main
-          fi
+      # 🔍 Step 7: Verify setup
+      - name: Verify environment
+        run: |
+          source ~/.buildozer/venv/bin/activate
+          echo "Python version:"
+          python --version
+          echo "Installed packages:"
+          pip list
+          echo "===== buildozer.spec ====="
+          cat buildozer.spec || echo "buildozer.spec NOT FOUND!"
+          echo "=========================="
+
+      # 🏗️ Step 8: Build the APK
+      - name: Build APK
+        run: |
+          source ~/.buildozer/venv/bin/activate
+          buildozer android debug
+
+      # 📦 Step 9: List build output
+      - name: List built files
+        run: |
+          echo "===== bin directory ====="
+          ls -lh bin || echo "bin/ directory not found!"
+          echo "=========================="
+
+      # ☁️ Step 10: Upload APK as artifact
+      - name: Upload built APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: built-apk
+          path: bin/*.apk
+
+      # 💾 Step 11: Commit built APK back to repo
+      - name: Commit built APK to repository
+        if: success()
+        run: |
+          mkdir -p output_apk
+          cp bin/*.apk output_apk/ || echo "No APK found"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add output_apk/ || true
+          git diff --quiet && echo "No changes to commit" || git commit -m "Add latest built APK"
+          git push
